@@ -198,7 +198,8 @@ test_plan:
     - "Model Integration & Prediction API"
     - "Image Upload & Prediction Interface"
     - "Modern UI Design & Components"
-  stuck_tasks: []
+  stuck_tasks: 
+    - "Model Integration & Prediction API"
   test_all: true
   test_priority: "high_first"
 
