@@ -363,7 +363,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-@app.on_startup
+@app.on_event("startup")
 async def startup_event():
     logger.info("🚀 AgriLens.AI API Server Starting")
     logger.info(f"📊 Model: {'Loaded' if model else 'Not Available'}")
