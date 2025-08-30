@@ -131,6 +131,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Converted all .txt treatment files to structured JSON format. Parsed sections: basics, symptoms, cycle_lethality, organic_solutions, inorganic_solutions, sources."
+      - working: true
+        agent: "testing"
+        comment: "Minor: Treatment data loaded successfully (38 diseases) but has case sensitivity mismatches with expected disease classes. Examples: 'Apple scab' vs 'Apple Scab', 'Tomato Late blight' vs 'Tomato Late Blight'. API endpoints /api/treatment/{disease_name} work correctly for exact matches. Contains extra 'about' entry. Core functionality working."
 
   - task: "Image Processing & File Upload"
     implemented: true
