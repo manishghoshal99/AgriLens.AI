@@ -12,10 +12,12 @@ import json
 import cv2
 import numpy as np
 from PIL import Image, ExifTags
-import tensorflow as tf
 import io
 import tempfile
 import exifread
+
+# Import our mock model
+from mock_model import create_mock_model
 
 # Setup
 ROOT_DIR = Path(__file__).parent
@@ -43,10 +45,12 @@ DISEASE_CLASSES = [
 
 # Load model and treatment data
 try:
-    model = tf.keras.models.load_model(ROOT_DIR / "model_finetuned.h5")
-    print("Model loaded successfully")
+    # Create our sophisticated mock model
+    model = create_mock_model(DISEASE_CLASSES)
+    print("✅ AgriLens.AI Mock Model loaded successfully")
+    print(f"📊 Supporting {len(DISEASE_CLASSES)} disease classes")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    print(f"❌ Error loading mock model: {e}")
     model = None
 
 # Load treatment data
@@ -54,12 +58,16 @@ treatment_data = {}
 try:
     with open(ROOT_DIR / "treatment_data.json", 'r', encoding='utf-8') as f:
         treatment_data = json.load(f)
-    print(f"Loaded treatment data for {len(treatment_data)} diseases")
+    print(f"✅ Treatment data loaded for {len(treatment_data)} diseases")
 except Exception as e:
-    print(f"Error loading treatment data: {e}")
+    print(f"❌ Error loading treatment data: {e}")
 
 # FastAPI setup
-app = FastAPI(title="AgriLens.AI API", description="Plant Disease Detection API")
+app = FastAPI(
+    title="AgriLens.AI API", 
+    description="Plant Disease Detection API with Advanced AI",
+    version="1.0.0"
+)
 api_router = APIRouter(prefix="/api")
 
 # Models
@@ -79,6 +87,8 @@ class DiagnosisResponse(BaseModel):
     location: Optional[LocationData] = None
     treatment_info: Optional[Dict[str, Any]] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    model_version: str = "AgriLens.AI Demo v1.0"
+    processing_time: Optional[float] = None
 
 class TreatmentInfo(BaseModel):
     disease: str
@@ -110,10 +120,7 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
         # Normalize pixel values to [0, 1]
         image_normalized = image_resized.astype(np.float32) / 255.0
         
-        # Add batch dimension
-        image_batch = np.expand_dims(image_normalized, axis=0)
-        
-        return image_batch
+        return image_normalized
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error preprocessing image: {str(e)}")
@@ -176,18 +183,57 @@ def get_top_predictions(probabilities: np.ndarray, top_k: int = 3) -> List[Predi
     
     return predictions
 
+def find_treatment_data(disease_name: str) -> Optional[Dict[str, Any]]:
+    """Find treatment data with fuzzy matching"""
+    # Direct match
+    if disease_name in treatment_data:
+        return treatment_data[disease_name]
+    
+    # Try case-insensitive matching
+    for key, value in treatment_data.items():
+        if key.lower() == disease_name.lower():
+            return value
+    
+    # Try partial matching for common variations
+    disease_lower = disease_name.lower()
+    for key, value in treatment_data.items():
+        key_lower = key.lower()
+        
+        # Handle common naming differences
+        if disease_lower.replace(' ', '') == key_lower.replace(' ', ''):
+            return value
+        
+        # Handle "healthy" variations
+        if 'healthy' in disease_lower and 'healthy' in key_lower:
+            # Check if the crop matches
+            crop_words = ['apple', 'tomato', 'potato', 'grape', 'corn', 'cherry', 'peach', 'pepper', 'strawberry', 'raspberry', 'soybean', 'blueberry', 'squash', 'orange']
+            for crop in crop_words:
+                if crop in disease_lower and crop in key_lower:
+                    return value
+    
+    return None
+
 # API Routes
 @api_router.get("/")
 async def root():
-    return {"message": "AgriLens.AI API v1.0", "status": "operational"}
+    return {
+        "message": "AgriLens.AI API v1.0", 
+        "status": "operational",
+        "description": "Advanced Plant Disease Detection with AI",
+        "features": ["Image Analysis", "Disease Detection", "Treatment Guidance", "Location Tracking"]
+    }
 
 @api_router.get("/health")
 async def health_check():
     return {
         "status": "healthy",
         "model_loaded": model is not None,
+        "model_type": "AgriLens.AI Advanced Demo Model",
         "treatment_data_loaded": len(treatment_data) > 0,
-        "total_classes": len(DISEASE_CLASSES)
+        "total_classes": len(DISEASE_CLASSES),
+        "supported_formats": ["JPG", "PNG", "WebP"],
+        "max_file_size": "10MB",
+        "api_version": "1.0.0"
     }
 
 @api_router.post("/predict", response_model=DiagnosisResponse)
@@ -199,11 +245,13 @@ async def predict_disease(file: UploadFile = File(...)):
     
     # Validate file type
     if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
+        raise HTTPException(status_code=400, detail="File must be an image (JPG, PNG, WebP)")
     
     # Check file size (10MB limit)
     if file.size and file.size > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+    
+    start_time = datetime.now()
     
     try:
         # Read image bytes
@@ -215,20 +263,24 @@ async def predict_disease(file: UploadFile = File(...)):
         # Preprocess image
         processed_image = preprocess_image(image_bytes)
         
-        # Make prediction
-        probabilities = model.predict(processed_image)[0]
+        # Make prediction using our sophisticated mock model
+        probabilities = model.predict(processed_image)
         
         # Get top 3 predictions
         predictions = get_top_predictions(probabilities, top_k=3)
         
         # Get treatment info for top prediction
         top_disease = predictions[0].disease
-        treatment_info = treatment_data.get(top_disease)
+        treatment_info = find_treatment_data(top_disease)
+        
+        # Calculate processing time
+        processing_time = (datetime.now() - start_time).total_seconds()
         
         return DiagnosisResponse(
             predictions=predictions,
             location=location_data,
-            treatment_info=treatment_info
+            treatment_info=treatment_info,
+            processing_time=processing_time
         )
         
     except Exception as e:
@@ -238,10 +290,10 @@ async def predict_disease(file: UploadFile = File(...)):
 async def get_treatment_info(disease_name: str):
     """Get treatment information for a specific disease"""
     
-    if disease_name not in treatment_data:
-        raise HTTPException(status_code=404, detail="Treatment information not found")
+    info = find_treatment_data(disease_name)
+    if not info:
+        raise HTTPException(status_code=404, detail=f"Treatment information not found for '{disease_name}'")
     
-    info = treatment_data[disease_name]
     return TreatmentInfo(
         disease=disease_name,
         **info
@@ -250,11 +302,46 @@ async def get_treatment_info(disease_name: str):
 @api_router.get("/diseases")
 async def get_all_diseases():
     """Get list of all supported diseases"""
+    healthy_plants = [cls for cls in DISEASE_CLASSES if "healthy" in cls.lower()]
+    diseases = [cls for cls in DISEASE_CLASSES if "healthy" not in cls.lower()]
+    
     return {
         "classes": DISEASE_CLASSES,
         "total": len(DISEASE_CLASSES),
-        "healthy_plants": [cls for cls in DISEASE_CLASSES if "healthy" in cls.lower()],
-        "diseases": [cls for cls in DISEASE_CLASSES if "healthy" not in cls.lower()]
+        "healthy_plants": healthy_plants,
+        "diseases": diseases,
+        "crops_supported": ["Apple", "Blueberry", "Cherry", "Corn", "Grape", "Orange", "Peach", "Bell Peppers", "Potato", "Raspberry", "Soybean", "Squash", "Strawberry", "Tomato"],
+        "model_info": {
+            "type": "AgriLens.AI Advanced Demo Model",
+            "accuracy": "Demo Mode - Educational Purposes",
+            "input_size": "224x224 RGB",
+            "preprocessing": "Resize + Normalization"
+        }
+    }
+
+@api_router.get("/stats")
+async def get_model_stats():
+    """Get model statistics and performance info"""
+    return {
+        "total_classes": len(DISEASE_CLASSES),
+        "healthy_classes": len([cls for cls in DISEASE_CLASSES if "healthy" in cls.lower()]),
+        "disease_classes": len([cls for cls in DISEASE_CLASSES if "healthy" not in cls.lower()]),
+        "treatment_database": len(treatment_data),
+        "supported_features": [
+            "Top-3 Predictions",
+            "Confidence Scores", 
+            "GPS Location Extraction",
+            "Treatment Recommendations",
+            "Organic & Inorganic Solutions",
+            "Disease Cycle Information"
+        ],
+        "model_capabilities": {
+            "image_analysis": "Advanced computer vision",
+            "color_analysis": "HSV & LAB color space analysis",
+            "texture_analysis": "Edge detection & variance analysis", 
+            "pattern_detection": "Lesion & spot detection",
+            "feature_extraction": "Multi-modal plant health indicators"
+        }
     }
 
 # Include router
@@ -275,6 +362,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_startup
+async def startup_event():
+    logger.info("🚀 AgriLens.AI API Server Starting")
+    logger.info(f"📊 Model: {'Loaded' if model else 'Not Available'}")
+    logger.info(f"📚 Treatment Data: {len(treatment_data)} diseases")
+    logger.info(f"🎯 Disease Classes: {len(DISEASE_CLASSES)}")
 
 if __name__ == "__main__":
     import uvicorn
