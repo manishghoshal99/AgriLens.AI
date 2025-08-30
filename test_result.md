@@ -196,3 +196,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "AgriLens.AI MVP completed! Implemented core features: 1) TensorFlow model integration with FastAPI backend serving 39 plant disease classes, 2) Modern React frontend with Luma-inspired animations and mobile-first design, 3) Image upload with drag-drop and camera capture, 4) Treatment guidance with tabbed interface, 5) IndexedDB history with search/filter/export. Ready for comprehensive testing of the complete plant disease detection workflow."
+  - agent: "testing"
+    message: "Backend API testing completed. CRITICAL ISSUE: TensorFlow model not loading due to Git LFS file not being downloaded (model_finetuned.h5 is only a 134-byte pointer file instead of 491MB model). API endpoints working correctly otherwise. Treatment data has case sensitivity mismatches with expected disease classes. Backend infrastructure is solid but requires model file fix and treatment data key normalization."
