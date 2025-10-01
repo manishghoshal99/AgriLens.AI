@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.env
+.env.*
+.venv/
+backend/.venv/
+
+# Large/binary model artifacts
+backend/model_finetuned.h5
+backend/*.h5
+
+# Node/JS
+frontend/node_modules/
+frontend/.env
+frontend/.env.*
+frontend/build/
+
+# OS/IDE
+.DS_Store
+*.log
+.yarn-integrity
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp
+.temp/
+temp_repo/
+.cache/
