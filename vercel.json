@@ -10,7 +10,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "https://YOUR-BACKEND-URL/api/$1"
+      "dest": "https://your-backend-hostname-or-ip/api/$1"
     }
   ]
 }
