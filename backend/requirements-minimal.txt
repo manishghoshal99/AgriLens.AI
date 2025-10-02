@@ -1,0 +1,12 @@
+fastapi==0.110.1
+uvicorn==0.25.0
+python-dotenv>=1.0.1
+pydantic>=2.6.4
+python-multipart>=0.0.9
+opencv-python-headless>=4.8.0
+pillow>=10.0.0
+numpy>=1.26.0
+exifread>=3.0.0
+requests>=2.31.0
+
+

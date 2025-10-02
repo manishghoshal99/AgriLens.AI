@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "frontend/build" }
+    }
+  ],
+  "build": {
+    "env": {
+      "REACT_APP_BACKEND_URL": "@react_app_backend_url"
+    }
+  },
+  "env": {
+    "REACT_APP_BACKEND_URL": "@react_app_backend_url"
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://YOUR-BACKEND-URL/api/$1"
+    }
+  ]
+}
+
+
