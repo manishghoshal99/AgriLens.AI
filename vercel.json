@@ -7,14 +7,6 @@
       "config": { "distDir": "frontend/build" }
     }
   ],
-  "build": {
-    "env": {
-      "REACT_APP_BACKEND_URL": "@react_app_backend_url"
-    }
-  },
-  "env": {
-    "REACT_APP_BACKEND_URL": "@react_app_backend_url"
-  },
   "routes": [
     {
       "src": "/api/(.*)",
