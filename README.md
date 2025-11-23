@@ -2,7 +2,7 @@
 
 # AgriLens.AI
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/manishghoshal99/AgriLens.AI/tree/main3)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/manishghoshal99/AgriLens.AI)
 
 Full-stack demo for plant disease diagnosis (FastAPI backend + React frontend).
 
