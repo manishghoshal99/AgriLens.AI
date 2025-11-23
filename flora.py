@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+import os
 from keras.models import load_model
 import numpy as np
 from exif import Image as im
@@ -18,12 +19,18 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'LensFleur'
 app.config['MYSQL_DB'] = 'lensfleur'
 app.config['SECRET_KEY'] = 'lensfleur'
-mysql = MySQLdb.connect(
-    host=app.config['MYSQL_HOST'],
-    user=app.config['MYSQL_USER'],
-    passwd=app.config['MYSQL_PASSWORD'],
-    db=app.config['MYSQL_DB']
-)
+try:
+    mysql = MySQLdb.connect(
+        host=app.config['MYSQL_HOST'],
+        user=app.config['MYSQL_USER'],
+        passwd=app.config['MYSQL_PASSWORD'],
+        db=app.config['MYSQL_DB'],
+        connect_timeout=5
+    )
+    print("Connected to MySQL database.")
+except Exception as e:
+    print(f"Error connecting to MySQL: {e}")
+    mysql = None
 
 classes=['Apple scab', 'Apple Black rot', 'Cedar apple rust', 
          'Apple healthy', 'Blueberry healthy', 
@@ -44,7 +51,70 @@ classes=['Apple scab', 'Apple Black rot', 'Cedar apple rust',
 
 
 
-model = load_model("LensFleur-Flora.AI/model_finetuned.h5") 
+try:
+    if os.path.exists("LensFleur-Flora.AI/model_finetuned.h5"):
+        model = load_model("LensFleur-Flora.AI/model_finetuned.h5")
+    else:
+        print("Model file not found. Using mock model.")
+        model = None
+except Exception as e:
+    print(f"Error loading model: {e}")
+    model = None
+
+@app.route('/api/predict', methods=['POST'])
+def predict_api():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if model is None:
+        # Mock response
+        return jsonify({
+            "predictions": [
+                {"disease": "System Check (Model Missing)", "confidence": 1.0},
+                {"disease": "Healthy", "confidence": 0.0}
+            ],
+            "location": "Mock Location (Server)",
+            "treatment_info": {
+                "description": "The AI model file is missing on the server, so this is a simulated response to verify the pipeline works.",
+                "symptoms": "N/A",
+                "treatment": "Upload the model_finetuned.h5 file to the server to get real predictions."
+            }
+        })
+
+    # Real prediction logic (simplified for API)
+    try:
+        # Save temp file
+        image_path = "temp_" + file.filename
+        file.save(image_path)
+        
+        my_image = cv2.imread(image_path)
+        my_image = cv2.resize(my_image, (224, 224))
+        my_image = my_image / 255
+        probabilities = model.predict(np.asarray([my_image]))[0]
+        class_idx = np.argmax(probabilities)
+        prediction = classes[class_idx]
+        confidence = float(probabilities[class_idx])
+        
+        # Clean up
+        os.remove(image_path)
+        
+        return jsonify({
+            "predictions": [
+                {"disease": prediction, "confidence": confidence}
+            ],
+            "location": "Detected from Image",
+            "treatment_info": {
+                "description": f"Detected {prediction}",
+                "symptoms": "See detailed report",
+                "treatment": "Consult an expert"
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
 
 @app.route('/', methods = ['GET'])
 def index():
@@ -186,5 +256,5 @@ def predict():
     
 
 if __name__ == '__main__':
-    app.run(port = 3000, debug=True)
+    app.run(port = 8001, debug=True)
     

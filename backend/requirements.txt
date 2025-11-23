@@ -5,7 +5,7 @@ pymongo==4.5.0
 pydantic>=2.6.4
 motor==3.3.1
 python-multipart>=0.0.9
-tensorflow>=2.15.0
+
 opencv-python-headless>=4.8.0
 pillow>=10.0.0
 numpy>=1.26.0
