@@ -12,7 +12,9 @@ import {
   TrendingUp,
   Trophy,
   Star,
-  Zap
+  Zap,
+  Link as LinkIcon,
+  Globe
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
@@ -73,6 +75,9 @@ const GamificationHeader = ({ xp, level, streak }) => {
           </div>
         </div>
       </div>
+      <div className="absolute top-16 right-4 z-50">
+        <div id="google_translate_element" className="shadow-md rounded-lg overflow-hidden"></div>
+      </div>
     </motion.div>
   );
 };
@@ -91,6 +96,8 @@ const DiagnosisPage = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'url'
+  const [imageUrl, setImageUrl] = useState('');
   const [xp, setXp] = useState(() => parseInt(localStorage.getItem('plant_doctor_xp') || '0'));
   const [streak, setStreak] = useState(() => parseInt(localStorage.getItem('plant_doctor_streak') || '1'));
   const [level, setLevel] = useState(1);
@@ -158,6 +165,24 @@ const DiagnosisPage = () => {
     const file = event.target.files[0];
     if (file) {
       handleFileSelect([file]);
+    }
+  };
+
+  const handleUrlSubmit = async (e) => {
+    e.preventDefault();
+    if (!imageUrl) return;
+
+    try {
+      setIsAnalyzing(true);
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const file = new File([blob], "url_image.jpg", { type: blob.type });
+      handleFileSelect([file]);
+      setIsAnalyzing(false);
+    } catch (error) {
+      console.error("URL Load Error:", error);
+      toast.error("Failed to load image. Check URL or CORS policy.");
+      setIsAnalyzing(false);
     }
   };
 
@@ -322,14 +347,64 @@ const DiagnosisPage = () => {
               transition={{ duration: 0.6, delay: 0.1 }}
             >
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Upload Plant Image</h2>
+                <div className="flex gap-4 mb-6">
+                  <button
+                    onClick={() => setUploadMode('file')}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${uploadMode === 'file'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                      }`}
+                  >
+                    Upload File
+                  </button>
+                  <button
+                    onClick={() => setUploadMode('url')}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${uploadMode === 'url'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                      }`}
+                  >
+                    Image URL
+                  </button>
+                </div>
 
-                {!preview ? (
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+                  {uploadMode === 'file' ? 'Upload Plant Image' : 'Paste Image URL'}
+                </h2>
+
+                {uploadMode === 'url' && !preview && (
+                  <form onSubmit={handleUrlSubmit} className="mb-6">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <input
+                          type="url"
+                          placeholder="https://example.com/plant.jpg"
+                          value={imageUrl}
+                          onChange={(e) => setImageUrl(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!imageUrl || isAnalyzing}
+                        className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      >
+                        Load
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Note: Some URLs may not work due to security policies (CORS).
+                    </p>
+                  </form>
+                )}
+
+                {!preview && uploadMode === 'file' && (
                   <div
                     {...getRootProps()}
                     className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 ${isDragActive
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-50'
+                      ? 'border-emerald-500 bg-emerald-50'
+                      : 'border-gray-300 hover:border-emerald-400 hover:bg-emerald-50'
                       }`}
                   >
                     <input {...getInputProps()} />
@@ -342,7 +417,9 @@ const DiagnosisPage = () => {
                       Supports JPG, PNG, WebP (max 10MB)
                     </p>
                   </div>
-                ) : (
+                )}
+
+                {preview && (
                   <div className="relative">
                     <img
                       src={preview}
@@ -358,34 +435,36 @@ const DiagnosisPage = () => {
                   </div>
                 )}
 
-                <div className="flex gap-4 mt-6">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border-2 border-emerald-600 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-all duration-200"
-                  >
-                    <Upload className="w-5 h-5" />
-                    Choose File
-                  </motion.button>
+                {uploadMode === 'file' && (
+                  <div className="flex gap-4 mt-6">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border-2 border-emerald-600 text-emerald-600 rounded-xl hover:bg-emerald-50 transition-all duration-200"
+                    >
+                      <Upload className="w-5 h-5" />
+                      Choose File
+                    </motion.button>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={startCamera}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all duration-200"
-                  >
-                    <Camera className="w-5 h-5" />
-                    Take Photo
-                  </motion.button>
-                </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={startCamera}
+                      className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all duration-200"
+                    >
+                      <Camera className="w-5 h-5" />
+                      Take Photo
+                    </motion.button>
+                  </div>
+                )}
 
                 {selectedFile && (
                   <motion.button
@@ -527,7 +606,8 @@ const DiagnosisPage = () => {
 
         <canvas ref={canvasRef} className="hidden" />
       </div>
-      );
+    </div>
+  );
 };
 
-      export default DiagnosisPage;
+export default DiagnosisPage;
