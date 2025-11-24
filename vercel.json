@@ -2,15 +2,10 @@
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/build",
   "installCommand": "cd backend && pip install -r requirements.txt",
-  "functions": {
-    "backend/server.py": {
-      "runtime": "python3.9"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/server.py"
+      "destination": "/api/server"
     },
     {
       "source": "/(.*)",
