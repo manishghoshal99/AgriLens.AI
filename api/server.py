@@ -9,8 +9,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
 import json
-import cv2
-import numpy as np
+import json
 from PIL import Image, ExifTags
 import io
 import tempfile
@@ -101,29 +100,8 @@ class TreatmentInfo(BaseModel):
     sources: str
 
 # Helper functions
-def preprocess_image(image_bytes: bytes) -> np.ndarray:
-    """Preprocess image for model prediction"""
-    try:
-        # Convert bytes to PIL Image
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Convert to RGB if needed
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Convert to numpy array
-        image_array = np.array(image)
-        
-        # Resize to model input size (224x224)
-        image_resized = cv2.resize(image_array, (224, 224))
-        
-        # Normalize pixel values to [0, 1]
-        image_normalized = image_resized.astype(np.float32) / 255.0
-        
-        return image_normalized
-        
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error preprocessing image: {str(e)}")
+# Note: preprocess_image removed as our optimized mock model handles raw bytes directly
+
 
 def extract_gps_from_image(image_bytes: bytes) -> Optional[LocationData]:
     """Extract GPS coordinates from image EXIF data"""
@@ -168,10 +146,16 @@ def extract_gps_from_image(image_bytes: bytes) -> Optional[LocationData]:
     
     return None
 
-def get_top_predictions(probabilities: np.ndarray, top_k: int = 3) -> List[PredictionResult]:
+def get_top_predictions(probabilities: List[float], top_k: int = 3) -> List[PredictionResult]:
     """Get top K predictions from model output"""
-    # Get top indices
-    top_indices = np.argsort(probabilities)[::-1][:top_k]
+    # Create list of (index, prob) tuples
+    indexed_probs = list(enumerate(probabilities))
+    
+    # Sort by probability descending
+    indexed_probs.sort(key=lambda x: x[1], reverse=True)
+    
+    # Get top K
+    top_indices = [x[0] for x in indexed_probs[:top_k]]
     
     predictions = []
     for rank, idx in enumerate(top_indices, 1):
@@ -260,11 +244,9 @@ async def predict_disease(file: UploadFile = File(...)):
         # Extract GPS data
         location_data = extract_gps_from_image(image_bytes)
         
-        # Preprocess image
-        processed_image = preprocess_image(image_bytes)
-        
         # Make prediction using our sophisticated mock model
-        probabilities = model.predict(processed_image)
+        # The new optimized model takes raw bytes directly
+        probabilities = model.predict(image_bytes)
         
         # Get top 3 predictions
         predictions = get_top_predictions(probabilities, top_k=3)
