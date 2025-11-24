@@ -14,13 +14,36 @@ from PIL import Image, ExifTags
 import io
 import tempfile
 import exifread
+import sys
+
+# Configure logging immediately
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger("AgriLensAPI")
 
 # Import our mock model
-from mock_model import create_mock_model
+try:
+    from mock_model import create_mock_model
+    logger.info("✅ Successfully imported mock_model")
+except ImportError as e:
+    logger.error(f"❌ Failed to import mock_model: {e}")
+    create_mock_model = None
 
 # Setup
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+try:
+    ROOT_DIR = Path(__file__).parent
+    logger.info(f"📂 ROOT_DIR: {ROOT_DIR}")
+    env_path = ROOT_DIR / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+        logger.info("✅ Loaded .env file")
+    else:
+        logger.warning("⚠️ No .env file found")
+except Exception as e:
+    logger.error(f"❌ Error in setup: {e}")
 
 # Disease classes (from original model)
 DISEASE_CLASSES = [
@@ -43,23 +66,30 @@ DISEASE_CLASSES = [
 ]
 
 # Load model and treatment data
+model = None
 try:
-    # Create our sophisticated mock model
-    model = create_mock_model(DISEASE_CLASSES)
-    print("✅ AgriLens.AI Mock Model loaded successfully")
-    print(f"📊 Supporting {len(DISEASE_CLASSES)} disease classes")
+    if create_mock_model:
+        # Create our sophisticated mock model
+        model = create_mock_model(DISEASE_CLASSES)
+        logger.info("✅ AgriLens.AI Mock Model loaded successfully")
+        logger.info(f"📊 Supporting {len(DISEASE_CLASSES)} disease classes")
+    else:
+        logger.error("❌ create_mock_model function is missing")
 except Exception as e:
-    print(f"❌ Error loading mock model: {e}")
-    model = None
+    logger.error(f"❌ Error loading mock model: {e}")
 
 # Load treatment data
 treatment_data = {}
 try:
-    with open(ROOT_DIR / "treatment_data.json", 'r', encoding='utf-8') as f:
-        treatment_data = json.load(f)
-    print(f"✅ Treatment data loaded for {len(treatment_data)} diseases")
+    json_path = ROOT_DIR / "treatment_data.json"
+    if json_path.exists():
+        with open(json_path, 'r', encoding='utf-8') as f:
+            treatment_data = json.load(f)
+        logger.info(f"✅ Treatment data loaded for {len(treatment_data)} diseases")
+    else:
+        logger.warning(f"⚠️ treatment_data.json not found at {json_path}")
 except Exception as e:
-    print(f"❌ Error loading treatment data: {e}")
+    logger.error(f"❌ Error loading treatment data: {e}")
 
 # FastAPI setup
 app = FastAPI(
