@@ -15,6 +15,7 @@ import io
 import tempfile
 import exifread
 import sys
+import requests
 
 # Configure logging immediately
 logging.basicConfig(
@@ -304,6 +305,66 @@ async def predict_disease(file: UploadFile = File(...)):
             processing_time=processing_time
         )
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
+class UrlRequest(BaseModel):
+    url: str
+
+@api_router.post("/predict_url", response_model=DiagnosisResponse)
+async def predict_disease_from_url(request: UrlRequest):
+    """Predict plant disease from image URL"""
+    global model
+    
+    if not model:
+        # Try to reload model if it's missing
+        try:
+            model = create_mock_model(DISEASE_CLASSES)
+        except:
+            raise HTTPException(status_code=503, detail="Model not available")
+
+    import requests
+    
+    try:
+        # Fetch image from URL
+        response = requests.get(request.url, timeout=10)
+        response.raise_for_status()
+        image_bytes = response.content
+        
+        # Validate it's an image
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            img.verify()
+        except:
+            raise HTTPException(status_code=400, detail="URL does not point to a valid image")
+            
+        # Reset bytes for processing
+        start_time = datetime.now()
+        
+        # Extract GPS data
+        location_data = extract_gps_from_image(image_bytes)
+        
+        # Make prediction
+        probabilities = model.predict(image_bytes)
+        
+        # Get top 3 predictions
+        predictions = get_top_predictions(probabilities, top_k=3)
+        
+        # Get treatment info
+        top_disease = predictions[0].disease
+        treatment_info = find_treatment_data(top_disease)
+        
+        processing_time = (datetime.now() - start_time).total_seconds()
+        
+        return DiagnosisResponse(
+            predictions=predictions,
+            location=location_data,
+            treatment_info=treatment_info,
+            processing_time=processing_time
+        )
+        
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch image from URL: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 

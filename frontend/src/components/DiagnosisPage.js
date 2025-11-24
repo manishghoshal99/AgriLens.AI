@@ -172,16 +172,35 @@ const DiagnosisPage = () => {
     e.preventDefault();
     if (!imageUrl) return;
 
+    setIsAnalyzing(true);
+    setResults(null);
+
     try {
-      setIsAnalyzing(true);
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const file = new File([blob], "url_image.jpg", { type: blob.type });
-      handleFileSelect([file]);
-      setIsAnalyzing(false);
+      // Send URL to backend for processing
+      const response = await axios.post(`${API}/predict_url`, { url: imageUrl }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      setResults(response.data);
+      setPreview(imageUrl); // Show the URL as preview
+
+      // Save to history
+      saveToHistory(response.data, imageUrl);
+
+      toast.success('Analysis complete!');
+      setXp(prev => prev + XP_PER_SCAN);
+      triggerConfetti();
+
     } catch (error) {
-      console.error("URL Load Error:", error);
-      toast.error("Failed to load image. Check URL or CORS policy.");
+      console.error("URL Analysis Error:", error);
+      if (error.response?.data?.detail) {
+        toast.error(error.response.data.detail);
+      } else {
+        toast.error("Failed to analyze image URL. Try a different link.");
+      }
+    } finally {
       setIsAnalyzing(false);
     }
   };
