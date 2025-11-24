@@ -99,6 +99,15 @@ app = FastAPI(
 )
 api_router = APIRouter(prefix="/api")
 
+# Root route for the App (handles / request if it hits the backend)
+@app.get("/")
+async def root_app():
+    return {
+        "message": "AgriLens.AI Backend is Running",
+        "docs": "/docs",
+        "api": "/api"
+    }
+
 # Models
 class PredictionResult(BaseModel):
     disease: str
