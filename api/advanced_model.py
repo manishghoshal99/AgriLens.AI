@@ -1,23 +1,14 @@
-"""
-AgriLens.AI Advanced Research-Grade Model
-Implements sophisticated Computer Vision algorithms for plant disease analysis.
-Uses a Hybrid Ensemble approach:
-1. Visual Feature Extraction (Color, Texture, Entropy)
-2. Statistical Anomaly Detection
-3. Probabilistic Inference
-"""
-
 import random
 from typing import List, Dict, Any, Tuple
 import hashlib
 from PIL import Image, ImageStat, ImageFilter
 import io
 import math
-import numpy as np
 
 class AgriLensAdvancedModel:
     """
     Research-Grade Plant Disease Analysis Engine.
+    Optimized for Serverless (Pure Python/Pillow - No Numpy).
     
     Architecture:
     - Feature Extractor: Extracts HSV color moments, texture entropy, and edge density.
@@ -48,30 +39,46 @@ class AgriLensAdvancedModel:
         - Necrosis (Browning): Indicator of fungal/late-stage disease
         - Healthy Tissue (Green): Indicator of health
         """
-        # Convert to HSV for better color separation
+        # Convert to HSV
         hsv_img = img.convert('HSV')
-        np_img = np.array(hsv_img)
         
-        # Extract channels
-        h = np_img[:,:,0]
-        s = np_img[:,:,1]
-        v = np_img[:,:,2]
+        # Get histogram (returns concatenation of H, S, V histograms)
+        # 256 bins per channel
+        hist = hsv_img.histogram()
+        total_pixels = img.width * img.height
         
-        total_pixels = h.size
+        if total_pixels == 0:
+            return {"green_index": 0.0, "chlorosis_index": 0.0, "necrosis_index": 0.0}
+            
+        # H: 0-255, S: 256-511, V: 512-767
+        h_hist = hist[0:256]
+        s_hist = hist[256:512]
+        v_hist = hist[512:768]
         
-        # Define masks (approximate ranges in 0-255 scale)
-        # Green: H ~ 40-80
-        green_mask = (h > 35) & (h < 85) & (s > 40)
+        # Helper to sum ranges
+        def sum_range(h_arr, start, end):
+            return sum(h_arr[max(0, start):min(256, end)])
+            
+        # Green: H ~ 40-85 (approx 60-120 degrees mapped to 0-255)
+        # In PIL HSV: Hue is 0-255. Green is around 85 (120 degrees).
+        # Range: 60-120 deg -> 42-85 in 0-255 scale
+        green_pixels = sum_range(h_hist, 35, 90)
         
-        # Yellow (Chlorosis): H ~ 20-40
-        yellow_mask = (h > 15) & (h <= 35) & (s > 40)
+        # Yellow (Chlorosis): H ~ 20-40 (approx 30-60 degrees)
+        # Range: 30-60 deg -> 21-42 in 0-255 scale
+        yellow_pixels = sum_range(h_hist, 20, 42)
         
-        # Brown/Black (Necrosis): Low V or specific Orange/Red hues
-        brown_mask = (v < 60) | ((h < 15) & (s > 50))
+        # Necrosis (Brown/Black):
+        # Brown is Orange/Red with low Value/Saturation.
+        # Black is low Value.
+        # We'll approximate by low Value count + Orange hue count
+        low_value_pixels = sum_range(v_hist, 0, 60)
+        orange_pixels = sum_range(h_hist, 10, 25) # Overlaps slightly with yellow
         
-        green_ratio = np.sum(green_mask) / total_pixels
-        yellow_ratio = np.sum(yellow_mask) / total_pixels
-        brown_ratio = np.sum(brown_mask) / total_pixels
+        # Normalize
+        green_ratio = green_pixels / total_pixels
+        yellow_ratio = yellow_pixels / total_pixels
+        brown_ratio = (low_value_pixels + orange_pixels) / (total_pixels * 1.5) # Damping factor
         
         return {
             "green_index": float(green_ratio),
@@ -83,7 +90,6 @@ class AgriLensAdvancedModel:
         """
         Calculate Shannon Entropy of the image texture.
         High entropy correlates with complex lesion patterns (spots, rust).
-        Low entropy correlates with smooth healthy leaves or uniform blights.
         """
         # Convert to grayscale
         gray = img.convert('L')
@@ -103,12 +109,12 @@ class AgriLensAdvancedModel:
     def _detect_edges_severity(self, img: Image.Image) -> float:
         """
         Use Laplacian edge detection to quantify surface irregularity.
-        Healthy leaves are smoother; diseased leaves have more edges (spots, veins).
         """
         # Apply edge enhancement filter
         edges = img.filter(ImageFilter.FIND_EDGES).convert('L')
         edge_stat = ImageStat.Stat(edges)
-        return edge_stat.mean[0] / 255.0  # Normalize
+        # Mean brightness of edge map indicates edge density
+        return edge_stat.mean[0] / 255.0
 
     def predict(self, image_bytes: bytes) -> List[float]:
         """
