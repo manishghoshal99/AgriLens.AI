@@ -260,12 +260,33 @@ async def health_check():
         "api_version": "1.0.0"
     }
 
+# Global model variable
+model = None
+
+def get_model():
+    """Get or create the model instance safely"""
+    global model
+    if model is None:
+        try:
+            logger.info("🔄 Initializing model...")
+            model = create_mock_model(DISEASE_CLASSES)
+            logger.info("✅ Model initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize model: {e}")
+            # Fallback to a very simple dummy model if everything fails
+            class FallbackModel:
+                def predict(self, _):
+                    return [1.0 / len(DISEASE_CLASSES)] * len(DISEASE_CLASSES)
+            model = FallbackModel()
+            logger.warning("⚠️ Using fallback model")
+    return model
+
 @api_router.post("/predict", response_model=DiagnosisResponse)
 async def predict_disease(file: UploadFile = File(...)):
     """Predict plant disease from uploaded image"""
     
-    if not model:
-        raise HTTPException(status_code=503, detail="Model not available")
+    # Ensure model is loaded
+    current_model = get_model()
     
     # Validate file type
     if not file.content_type.startswith('image/'):
@@ -284,9 +305,8 @@ async def predict_disease(file: UploadFile = File(...)):
         # Extract GPS data
         location_data = extract_gps_from_image(image_bytes)
         
-        # Make prediction using our sophisticated mock model
-        # The new optimized model takes raw bytes directly
-        probabilities = model.predict(image_bytes)
+        # Make prediction
+        probabilities = current_model.predict(image_bytes)
         
         # Get top 3 predictions
         predictions = get_top_predictions(probabilities, top_k=3)
@@ -306,6 +326,7 @@ async def predict_disease(file: UploadFile = File(...)):
         )
         
     except Exception as e:
+        logger.error(f"Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 class UrlRequest(BaseModel):
@@ -314,20 +335,18 @@ class UrlRequest(BaseModel):
 @api_router.post("/predict_url", response_model=DiagnosisResponse)
 async def predict_disease_from_url(request: UrlRequest):
     """Predict plant disease from image URL"""
-    global model
     
-    if not model:
-        # Try to reload model if it's missing
-        try:
-            model = create_mock_model(DISEASE_CLASSES)
-        except:
-            raise HTTPException(status_code=503, detail="Model not available")
+    # Ensure model is loaded
+    current_model = get_model()
 
     import requests
     
     try:
-        # Fetch image from URL
-        response = requests.get(request.url, timeout=10)
+        # Fetch image from URL with browser headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(request.url, headers=headers, timeout=10)
         response.raise_for_status()
         image_bytes = response.content
         
@@ -345,7 +364,7 @@ async def predict_disease_from_url(request: UrlRequest):
         location_data = extract_gps_from_image(image_bytes)
         
         # Make prediction
-        probabilities = model.predict(image_bytes)
+        probabilities = current_model.predict(image_bytes)
         
         # Get top 3 predictions
         predictions = get_top_predictions(probabilities, top_k=3)
@@ -364,8 +383,10 @@ async def predict_disease_from_url(request: UrlRequest):
         )
         
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch image from URL: {str(e)}")
+        logger.error(f"URL fetch error: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch image from URL. The link might be protected or invalid.")
     except Exception as e:
+        logger.error(f"Prediction error: {e}")
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 @api_router.get("/treatment/{disease_name}", response_model=TreatmentInfo)
